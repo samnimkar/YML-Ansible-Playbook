@@ -1,0 +1,83 @@
+##Create BY Shubham JOSHI (ESDS Software Solution)
+
+---
+- name: Install R1 soft
+  hosts: all
+  vars_prompt:
+      - name: r1soft
+        prompt: "Which R1 Soft server to install backup? Input options: please enter valid input R1 backup server ip"
+        private: no
+
+  tasks:
+   - name: Install repo
+     when: ansible_distribution == "CentOS"
+     yum_repository:
+       name: r1soft
+       description: R1Soft Repository Server
+       baseurl: http://repo.r1soft.com/yum/stable/$basearch/
+       enabled: yes
+       gpgcheck: no
+
+   
+   - name: Install R1 soft
+     yum:
+      name: "{{ packages }}"
+      state: present
+     vars:
+      packages:
+        - r1soft-cdp-enterprise-agent
+     when: ansible_distribution == "CentOS"
+
+   - name: Install r1soft agent
+     when: ansible_distribution == "RedHat"
+     yum:
+       name: "{{ packages }}"
+       state: present
+     vars:
+      packages:
+        - r1soft-cdp-enterprise-agent
+
+   - name: Start r1soft agent
+     when: ansible_distribution_major_version == "7"   
+     command: "/etc/init.d/cdp-agent start"     
+
+
+   - name: Start r1soft on centos 6
+     when: ansible_distribution_major_version == "6"
+     service:
+        name: cdp-agent
+        state: restarted
+        enabled: yes
+
+    
+   - name: Install Kernel Module
+     when: ansible_distribution == "CentOS"
+     yum:
+      name: "kernel-devel-{{ ansible_kernel }}"
+
+   - name: install r1soft module
+     command: r1soft-setup --get-module
+     args:
+       creates: "/lib/modules/r1soft/hcpdriver-cki-{{ ansible_kernel }}.ko"
+
+
+   - name: Add R1 soft backup server key on client server
+     command: r1soft-setup --get-key http://{{ r1soft }}
+
+
+   - name: Adding from R1Soft IP from server
+     command: iptables -I INPUT -s "{{ r1soft }}" -j ACCEPT
+
+
+   - name: Allow from R1Soft port to server 
+     command: iptables -I INPUT -p tcp --dport 1167 -j ACCEPT
+
+   - name: Iptables  sync completed
+     command: iptables-save
+
+#  - name: Allow from software firewalld
+#    command: csf -a "{{ vars[r1soft] }}"
+        
+#  - name: Reload from software firewalld
+#    command: csf -r
+

@@ -1,0 +1,86 @@
+---
+- name: Install R1 soft
+  hosts: esds
+  vars:
+        r1soft26: "5.77.47.74"
+        r1soft28: "10.13.1.141"
+        r1soft30: "10.13.1.142"
+
+  vars_prompt:
+      - name: r1soft
+        prompt: "Which R1 Soft server Do you want to install? Input options: r1soft26/r1soft27/r1soft28"
+        private: no
+
+  tasks:
+   - name: Install repo
+     yum_repository:
+       name: r1soft
+       description: R1Soft Repository Server
+       baseurl: http://repo.r1soft.com/yum/stable/$basearch/
+       enabled: yes
+       gpgcheck: no
+
+   
+   - name: Install R1 soft
+     when: ansible_distribution == "CentOS"
+     yum:
+      name: "{{ packages }}"
+      state: present
+     vars:
+      packages:
+        - r1soft-cdp-enterprise-agent
+        
+
+   - name: Install r1soft agent
+     when: ansible_distribution == "RedHat"
+     yum:
+       name: "{{ packages }}"
+       state: present
+     vars:
+      packages:
+        - r1soft-cdp-enterprise-agent
+
+   -  name: Start r1soft agent
+      when: ansible_distribution_major_version == "7"   
+      command: "/etc/init.d/cdp-agent start"     
+
+
+   -  name: Start r1soft on centos 6
+      when: ansible_distribution_major_version == "6"
+      service:
+        name: cdp-agent
+        state: restarted
+        enabled: yes
+
+    
+   - name: Install Kernel Module
+     when: ansible_distribution == "CentOS"
+     yum:
+      name: "kernel-devel-{{ ansible_kernel }}"
+
+   - name: install r1soft module
+     command: r1soft-setup --get-module
+     args:
+       creates: "/lib/modules/r1soft/hcpdriver-cki-{{ ansible_kernel }}.ko"
+
+
+   - name: Add R1 soft backup server key on client server
+     command: r1soft-setup --get-key http://{{ vars[r1soft] }}
+
+
+   - name: Adding from R1Soft IP from server
+     command: iptables -I INPUT -s   "{{ vars[r1soft] }}"  -j ACCEPT
+
+
+   - name: Allow From R1Soft port to server
+     command: iptables -I INPUT -p tcp --dport 1167 -j ACCEPT
+
+   - name: Iptables currently sync now
+     command: iptables-save
+
+   - name: Allow from software firewalld
+     command: csf -a "{{ vars[r1soft] }}"
+
+   - name: Reload from software firewalld
+     command: csf -r
+

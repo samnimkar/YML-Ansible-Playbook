@@ -1,0 +1,32 @@
+---
+- name: To host Simple httpd website
+  hosts: all
+  remote_user: shubham
+  become: true
+  tasks:
+    - name: install the latest version of Apache
+      yum:
+        name: httpd
+        state: latest
+  
+    - lineinfile:
+        path: /var/www/html/index.html
+        line: My Hostname "{{ ansible_hostname }}"
+        create: yes
+
+    - name: Download httpd.conf
+      get_url:
+        url: https://devopblog.com/Playbooks/httpd.conf.j2
+        dest: /etc/httpd/conf.d/shubham.conf
+        
+
+    - service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: true
